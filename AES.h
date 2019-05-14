@@ -68,7 +68,7 @@ UC getS(UC x) {
 UC getIS(UC x) {
     //printf("%x %x\n", x >> 4, x & 0xf);
     //printf("0x%02x\n", invertSbox[x >> 4][x & 0xf]);
-    return invertSbox[x >> 4][x & 0xF];
+    return invertSbox[x >> 4][x & 0xf];
 }
 
 UC mult2(UC x) {
@@ -120,8 +120,27 @@ public:
         z = state[0][3]; state[0][3] = state[1][3]; state[1][3] = state[2][3]; state[2][3] = state[3][3]; state[3][3] = z;
     }
 
-    void MixColumns() {
-
+    void MixColumns(int flag) {
+        if (flag) {
+            for (int i = 0; i < 4; i++) {
+                UC temp[4];
+                for (int j = 0; j < 4; j++) {
+                    temp[j] = 0;
+                    for (int k = 0; k < 4; k++) temp[j] ^= mult(state[i][k], matrix[i][k]);
+                }
+                for (int j = 0; j < 4; j++) state[i][j] = temp[j];
+            }
+        }
+        else {
+            for (int i = 0; i < 4; i++) {
+                UC temp[4];
+                for (int j = 0; j < 4; j++) {
+                    temp[j] = 0;
+                    for (int k = 0; k < 4; k++) temp[j] ^= mult(state[i][k], Imatrix[i][k]);
+                }
+                for (int j = 0; j < 4; j++) state[i][j] = temp[j];
+            }
+        }
     }
 };
 #endif // AES_H_
