@@ -285,9 +285,9 @@ int main() {
     //testCI();
     //testRConj();
     //testKeystream();
-    //testAES128();
-    //testAES192();
-    //testAES256();
+    testAES128();
+    testAES192();
+    testAES256();
     //testRand();
     testEncryptMessage(shortM, 128);
     testEncryptMessage(shortM, 192);
