@@ -8,22 +8,80 @@
 
 int keys[8] = {};
 int output[4] = {};
-UC* message;
+UC* message, *Omessage, *Pmessage;
 
 int pad(int len) {
-    return (len & 0x1FF) ? (len & 0xFFFFFE00) + 512 : len;
+    return (len & 0xF) ? (len & 0xFFFFFFF0) + 16 : len;
 }
-void genShortMessage(int len) {
+int genMessage(int len) {
     int nlen = pad(len);
     message = new UC[nlen];
-    memset(message, 0, sizeof(message));
+    memset(message, 0, nlen);
     for (int i = 0; i < len; i++) message[i] = (UC) rand();    ///or we could read message here
+    return nlen;
 }
 
-void testEncryptMessage() {
-    genShortMessage();
+void testEncryptMessage(int length, int type) {
+    int nlen;
+    keys[0] = 0x03020100;
+    keys[1] = 0x07060504;
+    keys[2] = 0x0b0a0908;
+    keys[3] = 0x0f0e0d0c;
+    keys[4] = 0x13121110;
+    keys[5] = 0x17161514;    ///given key
+
+    nlen = genMessage(length);
+    Omessage = new UC[nlen];
+    Pmessage = new UC[nlen];                ///buffer for output
+    memset(Omessage, 0, nlen);
+    memset(Pmessage, 0, nlen);
+
+    //for (int i = 0; i < nlen; i++) printf("%02x", message[i]); putchar('\n');
+
+    //printf("Preparing test...\n");
+
+    time_t t0 = clock();
+
+    ///Encrypt
+    CBC_AES solver;
+    solver.initKeys(type, keys);
+    for (int i = 0; i < 4; i++) solver.IV[i] = 0;
+    solver.encrypt(message, Omessage, nlen);
+
+    //for (int i = 0; i < nlen; i++) printf("%02x", Omessage[i]); putchar('\n');
+
+    time_t t1 = clock();
+    //printf("Encrypt\n");
+
+    ///Decrypt
+    CBC_AES de_solver;
+    de_solver.initKeys(type, keys);
+    for (int i = 0; i < 4; i++) de_solver.IV[i] = 0;
+    de_solver.decrypt(Omessage, Pmessage, nlen);
+
+    //for (int i = 0; i < nlen; i++) printf("%02x", Pmessage[i]); putchar('\n');
+
+    time_t t2 = clock();
+    //printf("Decrypt\n");
+
+    ///Verify
+    bool ok = true;
+    for (int i = 0; i < nlen; i++) if (message[i] != Pmessage[i]) {
+        ok = false; break;
+    }
+    if (ok) printf("Test success!\n"); else printf("Test failed!\n");
+
+    //printf("%d\n", CLOCKS_PER_SEC);
+    printf("Type: AES-%d; Length(bytes): %d; ", type, length);
+    //printf("Time: %d %d %d\n", t0, t1, t2);
+
+    float dt0 = ((float)(t1-t0))/CLOCKS_PER_SEC, dt1 = ((float)(t2-t1))/CLOCKS_PER_SEC;
+    printf("Encrypt time: %fs; Decrypt time: %fs\n", dt0, dt1);
 
     delete [] message;
+    delete [] Omessage;
+    delete [] Pmessage;
+
 }
 
 void testRand() {
@@ -214,6 +272,10 @@ void testAES256() {
 
 }
 
+void totalTest() {
+
+}
+
 int main() {
     srand(time(NULL));
     printf("AES encryption and decryption program\n");
@@ -223,10 +285,16 @@ int main() {
     //testCI();
     //testRConj();
     //testKeystream();
-    testAES128();
-    testAES192();
-    testAES256();
+    //testAES128();
+    //testAES192();
+    //testAES256();
     //testRand();
-    testEncryptMessage();
+    testEncryptMessage(shortM, 128);
+    testEncryptMessage(shortM, 192);
+    testEncryptMessage(shortM, 256);
+
+    testEncryptMessage(longM, 128);
+    testEncryptMessage(longM, 192);
+    testEncryptMessage(longM, 256);
     return 0;
 }

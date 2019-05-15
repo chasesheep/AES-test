@@ -1,0 +1,13 @@
+AES encryption and decryption program
+Test success!
+Type: AES-128; Length(bytes): 16384; Encrypt time: 0.006000s; Decrypt time: 0.012000s
+Test success!
+Type: AES-192; Length(bytes): 16384; Encrypt time: 0.006000s; Decrypt time: 0.016000s
+Test success!
+Type: AES-256; Length(bytes): 16384; Encrypt time: 0.010000s; Decrypt time: 0.017000s
+Test success!
+Type: AES-128; Length(bytes): 10485760; Encrypt time: 2.889000s; Decrypt time: 6.045000s
+Test success!
+Type: AES-192; Length(bytes): 10485760; Encrypt time: 3.493000s; Decrypt time: 7.435000s
+Test success!
+Type: AES-256; Length(bytes): 10485760; Encrypt time: 4.159000s; Decrypt time: 9.136000s

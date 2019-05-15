@@ -221,6 +221,7 @@ public:
     }
 
     void encrypt(int *output) {
+        //printf("Worker encrypting\n");
         generateKeys();
         addRoundkey(0);
         for (int i = 1; i < Nr; i++) {
@@ -256,17 +257,42 @@ public:
 class CBC_AES{
 public:
     AES worker;
+    int IV[4];
 
     void initKeys(int type, int *keys) {
         worker.initKeys(type, keys);
     }
 
-    void encrypt() {
+    ///Already padded
+    void encrypt(UC *message, UC *outputMessage, int len) {
+        int blockNum = len / 16;
 
+        UC *b = (UC *) &IV[0];
+        for (int j = 0; j < 16; j++) {
+            worker.state[j/4][j&3] = message[j] ^ b[j];
+        }
+
+        worker.encrypt((int *)&(outputMessage[0]));
+
+        for (int i = 1; i < blockNum; i++) {
+            int addr = i * 16;
+            for (int j = 0; j < 16; j++) worker.state[j/4][j&3] = message[addr+j] ^ outputMessage[addr+j-16];
+            worker.encrypt((int *)&(outputMessage[addr]));
+        }
     }
 
-    void decrypt() {
+    void decrypt(UC *message, UC *outputMessage, int len) {
+        int blockNum = len / 16;
+        for (int i = 0; i < blockNum; i++) {
+            int addr = i * 16;
+            for (int j = 0; j < 16; j++) worker.state[j/4][j&3] = message[addr+j];
+            worker.decrypt((int *)&(outputMessage[addr]));
+        }
 
+        UC *b = (UC *) &IV[0];
+
+        for (int i = 0; i < 16; i++) outputMessage[i] ^= b[i];
+        for (int i = 16; i < len; i++) outputMessage[i] ^= message[i-16];
     }
 };
 #endif // AES_H_
