@@ -72,21 +72,61 @@ UC getIS(UC x) {
 }
 
 UC mult2(UC x) {
-    return (x & 0xc0) ? ((x << 1)^0x1b) : (x << 1);
+    return (x & 0x80) ? ((x << 1)^0x1b) : (x << 1);
 }
 
 UC mult(UC a, UC b) {
+    //printf("mult: 0x%02x * 0x%02x", a, b);
     UC ans = 0;
     for (; a; a >>= 1) {
         if (a & 1) ans ^= b;
         b = mult2(b);
     }
+    //printf(" = 0x%02x\n", ans);
     return ans;
+}
+
+int rotateL(int x) {
+    return ((x >> 8) & 0xffffff) | ((x << 24) & 0xff000000);
+}
+
+int subBytes(int x) {
+    UC* b = (UC*) &x;
+    b[0] = getS(b[0]); b[1] = getS(b[1]); b[2] = getS(b[2]); b[3] = getS(b[3]);
+    return x;
 }
 
 class AES{
 public:
     UC state[4][4];
+    int flag;                     ///4, 6, 8; AES-128, AES-192, AES-256
+    int Nr;                       ///10, 12, 14
+    int round;                    ///0 to Nr-1
+    int keystream[200];
+
+    UC Rconj[15];
+
+
+    AES() {
+        flag = Nr = round = 0;
+    }
+    void initKeys(int type, int *keys) {
+        if (type == 128) {
+            flag = 4; Nr = 10;
+        } else if (type == 192) {
+            flag = 6; Nr = 12;
+        } else if (type == 256) {
+            flag = 8; Nr = 14;
+        } else {
+            printf("Error! %d does not match any given type.\n", type);
+            return;
+        }
+        for (int i = 0; i < flag; i++) keystream[i] = keys[i];
+        Rconj[1] = 0x1;
+        for (int i = 2; i <= Nr; i++) Rconj[i] = mult2(Rconj[i-1]);
+        //for (int i = 1; i <= Nr; i++) printf("0x%08x ", (unsigned int) Rconj[i]);
+        //putchar('\n');
+    }
 
     void Substitute() {
         for (int i = 0; i < 4; i++)
@@ -126,7 +166,7 @@ public:
                 UC temp[4];
                 for (int j = 0; j < 4; j++) {
                     temp[j] = 0;
-                    for (int k = 0; k < 4; k++) temp[j] ^= mult(state[i][k], matrix[i][k]);
+                    for (int k = 0; k < 4; k++) temp[j] ^= mult(matrix[j][k], state[i][k]);
                 }
                 for (int j = 0; j < 4; j++) state[i][j] = temp[j];
             }
@@ -136,11 +176,97 @@ public:
                 UC temp[4];
                 for (int j = 0; j < 4; j++) {
                     temp[j] = 0;
-                    for (int k = 0; k < 4; k++) temp[j] ^= mult(state[i][k], Imatrix[i][k]);
+                    for (int k = 0; k < 4; k++) temp[j] ^= mult(Imatrix[j][k], state[i][k]);
                 }
                 for (int j = 0; j < 4; j++) state[i][j] = temp[j];
             }
         }
+    }
+
+    void print() {
+        putchar('\n');
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) printf("0x%02x ", state[j][i]);
+            putchar('\n');
+        }
+        putchar('\n');
+    }
+
+    int T(int x, int i) {
+        x = rotateL(x);      ///Step 1: rotate
+        x = subBytes(x);  ///Step 2: substitute
+        x ^= (unsigned int) Rconj[i/flag];  ///Step 3: xor
+        return x;
+    }
+
+    void generateKeys() {
+        if (flag == 4 || flag == 6) {
+            for (int i = flag; i < 4 * (Nr + 1); i++) {
+                if (i % flag == 0) keystream[i] = keystream[i-flag] ^ T(keystream[i-1], i);
+                else keystream[i] = keystream[i-1] ^ keystream[i-flag];
+            }
+        } else if (flag == 8) {
+            for (int i = flag; i < 4 * (Nr + 1); i++) {
+                if (i % flag == 0) keystream[i] = keystream[i-flag] ^ T(keystream[i-1], i);
+                else if (i % flag == 4) keystream[i] = keystream[i-flag] ^ subBytes(keystream[i-1]);
+                else keystream[i] = keystream[i-1] ^ keystream[i-flag];
+            }
+        }
+    }
+
+    void addRoundkey(int round) {
+        round = round * 4;
+        int *ints = (int *) &state[0][0];
+        for (int i = 0; i < 4; i++) ints[i] ^= keystream[round + i];
+    }
+
+    void encrypt(int *output) {
+        generateKeys();
+        addRoundkey(0);
+        for (int i = 1; i < Nr; i++) {
+            Substitute();
+            ShiftRows();
+            MixColumns(1);
+            addRoundkey(i);
+        }
+        Substitute();
+        ShiftRows();
+        addRoundkey(Nr);
+        int *ints = (int *) &state[0][0];
+        for (int i = 0; i < 4; i++) output[i] = ints[i];
+    }
+
+    void decrypt(int *output) {
+        generateKeys();
+        addRoundkey(Nr);
+        for (int i = Nr-1; i > 0; i--) {
+            DeShiftRows();
+            DeSubstitute();
+            addRoundkey(i);
+            MixColumns(0);
+        }
+        DeShiftRows();
+        DeSubstitute();
+        addRoundkey(0);
+        int *ints = (int *) &state[0][0];
+        for (int i = 0; i < 4; i++) output[i] = ints[i];
+    }
+};
+
+class CBC_AES{
+public:
+    AES worker;
+
+    void initKeys(int type, int *keys) {
+        worker.initKeys(type, keys);
+    }
+
+    void encrypt() {
+
+    }
+
+    void decrypt() {
+
     }
 };
 #endif // AES_H_
